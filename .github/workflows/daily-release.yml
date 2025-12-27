@@ -2,9 +2,8 @@ name: Daily Auto-Release
 
 on:
   schedule:
-    # Запускать каждый день в 00:00 UTC
-    - cron: '0 0 * * *'
-  workflow_dispatch:  # чтобы можно было запустить вручную для теста
+    - cron: '0 0 * * *'  # Ежедневно в 00:00 UTC
+  workflow_dispatch:
 
 jobs:
   create-release:
@@ -19,12 +18,10 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          # Получаем дату в UTC (GitHub Actions по умолчанию в UTC)
           MONTH=$(date -u +%m)
           WEEK=$(date -u +%V)
-          WEEKDAY=$(date -u +%u)  # 1=Mon, 7=Sun
+          WEEKDAY=$(date -u +%u)
           TAG="v${MONTH}.${WEEK}.${WEEKDAY}"
-          echo "Generated tag: $TAG"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Check if tag already exists
@@ -32,27 +29,21 @@ jobs:
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "$TAG"; then
-            echo "Tag $TAG already exists. Skipping release."
             echo "exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Tag $TAG does not exist. Proceeding."
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create tag and release (if not exists)
+      - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag "$TAG"
-          git push origin "$TAG"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Daily Release ${{ steps.version.outputs.tag }}"
+          body: |
+            Автоматический релиз за $(date -u +'%Y-%m-%d').
 
-          # Создаём релиз через GitHub CLI
-          gh release create "$TAG" \
-            --title "Daily Release $TAG" \
-            --notes "Автоматический релиз за $(date -u +'%Y-%m-%d').\n\nСписок изменений:\n- Ежедневное обновление версии."
-
-      - name: Skip release (tag exists)
-        if: steps.check_tag.outputs.exists == 'true'
-        run: echo "Release already exists for today. Exiting gracefully."
+            Список изменений:
+            - Ежедневное обновление версии
+          draft: false
+          prerelease: false
