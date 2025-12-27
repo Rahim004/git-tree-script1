@@ -5,4 +5,4 @@
 ## Использование
 
 ```bash
-./git_tree.sh /путь/к/репозиторию
+https://github.com/Rahim004/git-tree-script1
